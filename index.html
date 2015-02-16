@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<script src="./core/engine-common.js"></script>
+	<script src="./canvasengine.js"></script>
+	<script src="./extends/Input.js"></script>
+	<script type="text/javascript">
+		var cols = 5;
+		var blockWidth = 640 / cols;
+		var blockHeight = 480 / 5;
+		var speed = 1.8;
+		var color = 'rgb(0, 153, 204)';
+
+		var canvas = CE.defines("game").extend(Input).ready(function() {
+			canvas.Scene.call("MyGame");
+		});
+			
+		canvas.Scene.new({
+			name: "MyGame",
+			els: [],
+			curCol: 0,
+			colsFilled: [],
+			
+			ready: function(stage) {
+				for (i = 0; i < cols; i++) {
+					this.colsFilled[i] = [];
+				}
+
+				this.createEl(stage);
+				
+				t = this;
+
+				canvas.Input.keyDown(Input.Left, function() {
+					if (t.curCol > 0 && (5 - t.colsFilled[t.curCol - 1].length) * blockHeight > t.els[t.els.length - 1].y + blockHeight) {
+						t.curCol--;
+					}
+				});
+
+				canvas.Input.keyDown(Input.Right, function() {
+					if (t.curCol < cols - 1 && (5 - t.colsFilled[t.curCol + 1].length) * blockHeight > t.els[t.els.length - 1].y + blockHeight) {
+						t.curCol++;
+					} 
+				});
+			},
+			
+			createEl: function(stage) {
+				this.els[this.els.length] = this.createElement(blockWidth, blockHeight);
+				this.els[this.els.length - 1].fillStyle = color;
+				this.els[this.els.length - 1].opacity = (Math.round(Math.random() * 2) + 1) * 0.25;
+				this.curCol = Math.round((cols - 1) * Math.random());
+				this.els[this.els.length - 1].fillRect(0, 0);
+				this.els[this.els.length - 1].x = this.curCol * blockWidth;
+				// this.el.setOriginPoint("middle");
+				stage.append(this.els[this.els.length - 1]);
+			},
+			
+			render: function(stage) {
+				noMoving = true;
+				if (this.els[this.els.length - 1].y + blockHeight < 480 - this.colsFilled[this.curCol].length * blockHeight) {
+					this.els[this.els.length - 1].y += speed;
+					this.els[this.els.length - 1].x = this.curCol * blockWidth;
+					noMoving = false;
+				} else {
+					if (this.colsFilled[this.curCol].length > 4) this.pause(true);
+					this.els[this.els.length - 1].y = (4 - this.colsFilled[this.curCol].length) * blockHeight;
+				}
+
+				for (i=0; i<this.colsFilled.length;i++) {
+					for (j=0; j<this.colsFilled[i].length; j++) {
+
+console.log(this.colsFilled[i][j].height);
+
+						if (this.colsFilled[i][j].height > blockHeight) {
+							this.colsFilled[i][j].height --;
+							this.colsFilled[i][j].refresh();
+						}
+					}
+				}
+
+				if (noMoving) {
+					for (i = 0; i < this.colsFilled[this.curCol].length; i++) {
+						if (this.colsFilled[this.curCol][i + 1] != undefined && this.colsFilled[this.curCol][i].opacity == this.colsFilled[this.curCol][i + 1].opacity) {
+console.log(123);
+							this.colsFilled[this.curCol][i+1].height *= 2;
+							this.colsFilled[this.curCol][i].remove();
+							this.colsFilled[this.curCol].splice(i, 1);
+						}
+					}
+
+					this.colsFilled[this.curCol][this.colsFilled[this.curCol].length] = this.els[this.els.length - 1];
+					
+					this.createEl(stage);
+				}
+				// this.el.rotation += 1;
+				stage.refresh();
+			}
+		});
+	</script>
+</head>
+<body>
+	<canvas id="game" width="640" height="480"></canvas>
+</body>
