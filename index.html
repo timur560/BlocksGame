@@ -1,102 +1,200 @@
 <!DOCTYPE html>
 <html>
 <head>
+	<style>
+		body { background-color: #1d1d1d; }
+	</style>
 	<script src="./core/engine-common.js"></script>
 	<script src="./canvasengine.js"></script>
 	<script src="./extends/Input.js"></script>
+	<script src="./extends/Hit.js"></script>
+	<script src="./extends/Animation.js"></script>
 	<script type="text/javascript">
 		var cols = 5;
-		var blockWidth = 640 / cols;
-		var blockHeight = 480 / 5;
-		var speed = 1.8;
+		var rows = 8;
+		var canvasWidth = 640;
+		var canvasHeight = 480;
+		var blockWidth = canvasWidth / cols;
+		var blockHeight = canvasHeight / rows;
+		var speed = 1.5;
 		var color = 'rgb(0, 153, 204)';
 
-		var canvas = CE.defines("game").extend(Input).ready(function() {
+		var canvas = CE.defines("game")
+			.extend(Input)
+			.extend(Hit)
+			.extend(Animation)
+			.ready(function() {
 			canvas.Scene.call("MyGame");
 		});
-			
-		canvas.Scene.new({
+
+		canvas.Scene.New({
 			name: "MyGame",
-			els: [],
-			curCol: 0,
+			blocks: [],
 			colsFilled: [],
+			updateBlocks: null,
 			
 			ready: function(stage) {
+				var self = this;
+
 				for (i = 0; i < cols; i++) {
 					this.colsFilled[i] = [];
 				}
 
-				this.createEl(stage);
-				
-				t = this;
+				this.blocks[this.blocks.length] = this.createBlock(stage);
 
 				canvas.Input.keyDown(Input.Left, function() {
-					if (t.curCol > 0 && (5 - t.colsFilled[t.curCol - 1].length) * blockHeight > t.els[t.els.length - 1].y + blockHeight) {
-						t.curCol--;
+					var currentBlock = self.blocks[self.blocks.length - 1];
+
+					var lColHeight = (self.blocks.filter(function(element){
+						return (element.el.x == currentBlock.el.x - blockWidth);
+					}).length + 1) * blockHeight;
+
+					if (currentBlock.el.x > 0 && (canvasHeight - lColHeight) > currentBlock.el.y) {
+						self.blocks[self.blocks.length - 1].move(-blockWidth);
 					}
 				});
 
 				canvas.Input.keyDown(Input.Right, function() {
-					if (t.curCol < cols - 1 && (5 - t.colsFilled[t.curCol + 1].length) * blockHeight > t.els[t.els.length - 1].y + blockHeight) {
-						t.curCol++;
-					} 
+					var currentBlock = self.blocks[self.blocks.length - 1];
+
+					var rColHeight = (self.blocks.filter(function(element){
+						return (element.el.x == currentBlock.el.x + blockWidth);
+					}).length + 1)* blockHeight;
+
+					if (currentBlock.el.x < (cols - 1) * blockWidth && (canvasHeight - rColHeight) > currentBlock.el.y) {
+						self.blocks[self.blocks.length - 1].move(+blockWidth);
+					}
 				});
 			},
 			
-			createEl: function(stage) {
-				this.els[this.els.length] = this.createElement(blockWidth, blockHeight);
-				this.els[this.els.length - 1].fillStyle = color;
-				this.els[this.els.length - 1].opacity = (Math.round(Math.random() * 2) + 1) * 0.25;
+			createBlock: function(stage) {
 				this.curCol = Math.round((cols - 1) * Math.random());
-				this.els[this.els.length - 1].fillRect(0, 0);
-				this.els[this.els.length - 1].x = this.curCol * blockWidth;
-				// this.el.setOriginPoint("middle");
-				stage.append(this.els[this.els.length - 1]);
+
+				var block = Class.New('Entity', [stage]);
+				block.rect(blockWidth, this.blockHeight);
+				block.position(blockWidth * Math.round(Math.random() * 4), 0);
+				block.el.fillStyle = color;
+				block.el.opacity = (Math.round(Math.random() * 2) + 1) * 0.25;
+				block.el.fillRect(0, 0, blockWidth, blockHeight);
+
+				stage.append(block.el);
+				return block;
 			},
 			
-			render: function(stage) {
-				noMoving = true;
-				if (this.els[this.els.length - 1].y + blockHeight < 480 - this.colsFilled[this.curCol].length * blockHeight) {
-					this.els[this.els.length - 1].y += speed;
-					this.els[this.els.length - 1].x = this.curCol * blockWidth;
-					noMoving = false;
-				} else {
-					if (this.colsFilled[this.curCol].length > 4) this.pause(true);
-					this.els[this.els.length - 1].y = (4 - this.colsFilled[this.curCol].length) * blockHeight;
-				}
+			updateRelatedBlocks: function(self) {
+				var done = false;
 
-				for (i=0; i<this.colsFilled.length;i++) {
-					for (j=0; j<this.colsFilled[i].length; j++) {
+				for (i = 0; i < self.blocks.length; i++) {
+					for (j = 0; j < self.blocks.length; j++) {
+						if (i != j 
+								&& self.blocks[i].el.x == self.blocks[j].el.x
+								&& self.blocks[i].el.y == self.blocks[j].el.y + blockHeight
+								&& self.blocks[i].el.opacity == self.blocks[j].el.opacity
+								&& self.blocks[i].el.opacity < 1) {
 
-console.log(this.colsFilled[i][j].height);
+							self.blocks[j].el.remove();
+							self.blocks.splice(j, 1);
 
-						if (this.colsFilled[i][j].height > blockHeight) {
-							this.colsFilled[i][j].height --;
-							this.colsFilled[i][j].refresh();
+							var timeline = canvas.Timeline.new(self.blocks[i].el);
+							timeline.to(
+								{opacity: self.blocks[i].el.opacity + 0.25}, 
+								30, 
+								Ease.easeOutCubic)
+							.call();
+
+							done = true;
 						}
 					}
+				}
+
+				if (done) {
+					setTimeout(this.updateRelatedBlocks, 500, self);
+				} else {
+					self.updateRows(self);
+				}
+
+			},
+
+			updateRows: function(self) {
+				// todo
+
+				var done = false;
+
+				var blocksMatrix = [];
+
+				for (i = 0; i < rows; i++) {
+					blocksMatrix[i] = [];
+				}
+
+				for (i = 0; i < self.blocks.length; i++) {
+					blocksMatrix[self.blocks[i].el.y / blockHeight][self.blocks[i].el.x / blockWidth] = i;
+				}
+				
+				console.log(blocksMatrix);
+
+				// for (i = 0; i < self.blocks.length; i++) {
+				// 	for (j = 0; j < self.blocks.length; j++) {
+				// 		if (i != j 
+				// 				&& self.blocks[i].el.x == self.blocks[j].el.x
+				// 				&& self.blocks[i].el.y == self.blocks[j].el.y + blockHeight
+				// 				&& self.blocks[i].el.opacity == self.blocks[j].el.opacity
+				// 				&& self.blocks[i].el.opacity < 1) {
+
+				// 			self.blocks[j].el.remove();
+				// 			self.blocks.splice(j, 1);
+
+				// 			var timeline = canvas.Timeline.new(self.blocks[i].el);
+				// 			timeline.to(
+				// 				{opacity: self.blocks[i].el.opacity + 0.25}, 
+				// 				30, 
+				// 				Ease.easeOutCubic)
+				// 			.call();
+
+				// 			done = true;
+				// 		}
+				// 	}
+				// }
+
+				if (done) {
+					setTimeout(this.updateRows, 500, self);
+				}
+
+			},
+
+			render: function(stage) {
+				// console.log(this.blocks);
+				// this.pause(true);
+				var self = this;
+				noMoving = true;
+				var currentBlock = this.blocks[this.blocks.length - 1];
+
+				var currentColHeight = this.blocks.filter(function(element){
+					return (element.el.x == currentBlock.el.x);
+				}).length * blockHeight;
+
+				if (currentBlock.el.y < canvasHeight - currentColHeight) {
+					this.blocks[this.blocks.length - 1].move(0, speed);
+					// this.blocks[this.blocks.length - 1].el.x = this.curCol * blockWidth;
+					noMoving = false;
+				} else {
+					if (currentColHeight > canvasHeight - blockHeight) this.pause(true);
+					currentBlock.el.y = canvasHeight - currentColHeight;
 				}
 
 				if (noMoving) {
-					for (i = 0; i < this.colsFilled[this.curCol].length; i++) {
-						if (this.colsFilled[this.curCol][i + 1] != undefined && this.colsFilled[this.curCol][i].opacity == this.colsFilled[this.curCol][i + 1].opacity) {
-console.log(123);
-							this.colsFilled[this.curCol][i+1].height *= 2;
-							this.colsFilled[this.curCol][i].remove();
-							this.colsFilled[this.curCol].splice(i, 1);
-						}
-					}
 
-					this.colsFilled[this.curCol][this.colsFilled[this.curCol].length] = this.els[this.els.length - 1];
+					var i = 0;
+
+					this.updateRelatedBlocks(this);
 					
-					this.createEl(stage);
+					self.blocks[self.blocks.length] = self.createBlock(stage);
+
 				}
-				// this.el.rotation += 1;
 				stage.refresh();
 			}
 		});
 	</script>
 </head>
 <body>
-	<canvas id="game" width="640" height="480"></canvas>
+	<canvas id="game" width="640" height="600"></canvas>
 </body>
