@@ -16,7 +16,9 @@
 		var canvasHeight = 480;
 		var blockWidth = canvasWidth / cols;
 		var blockHeight = canvasHeight / rows;
-		var speed = 1.5;
+		var slow = 1.5
+		var fast = 8;
+		var speed = slow;
 		var color = 'rgb(0, 153, 204)';
 
 		var canvas = CE.defines("game")
@@ -52,6 +54,14 @@
 					if (currentBlock.el.x > 0 && (canvasHeight - lColHeight) > currentBlock.el.y) {
 						self.blocks[self.blocks.length - 1].move(-blockWidth);
 					}
+				});
+
+				canvas.Input.keyDown(Input.Bottom, function() {
+					speed = fast;
+				});
+
+				canvas.Input.keyUp(Input.Bottom, function() {
+					speed = slow;
 				});
 
 				canvas.Input.keyDown(Input.Right, function() {
@@ -127,10 +137,34 @@
 				}
 
 				for (i = 0; i < self.blocks.length; i++) {
-					blocksMatrix[self.blocks[i].el.y / blockHeight][self.blocks[i].el.x / blockWidth] = i;
+					blocksMatrix[Math.floor(self.blocks[i].el.y / blockHeight)][self.blocks[i].el.x / blockWidth] = i;
 				}
 				
-				console.log(blocksMatrix);
+				// console.log(blocksMatrix);
+
+				topMatrixLoop: for (i = 0; i < blocksMatrix.length; i++) {
+					if (blocksMatrix[i].length < cols) continue;
+
+					if (self.blocks[0] != undefined) {
+						opacity = self.blocks[0];
+					} else {
+						continue;
+					}
+
+					for (j = 1; j < blocksMatrix[i]; j++) {
+						if (self.blocks[blocksMatrix[i][j]] != undefined) {
+							if (self.blocks[blocksMatrix[i][j]] != opacity) continue topMatrixLoop;
+						} else {
+							continue topMatrixLoop;
+						}
+					}
+
+					// remove this row
+					for (j = 1; j < blocksMatrix[i]; j++) {
+						self.blocks[blocksMatrix[i][j]].el.remove();
+						self.blocks.splice(blocksMatrix[i][j], 1);
+					}
+				}
 
 				// for (i = 0; i < self.blocks.length; i++) {
 				// 	for (j = 0; j < self.blocks.length; j++) {
@@ -188,6 +222,7 @@
 					this.updateRelatedBlocks(this);
 					
 					self.blocks[self.blocks.length] = self.createBlock(stage);
+					speed = slow;
 
 				}
 				stage.refresh();
