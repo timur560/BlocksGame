@@ -2,7 +2,7 @@
 <html>
 <head>
 	<style>
-		body { background-color: #1d1d1d; }
+		body { background-color: white; }
 	</style>
 	<script src="./core/engine-common.js"></script>
 	<script src="./canvasengine.js"></script>
@@ -118,9 +118,9 @@
 				}
 
 				if (done) {
-					setTimeout(this.updateRelatedBlocks, 500, self);
+					setTimeout(self.updateRelatedBlocks, 600, self);
 				} else {
-					self.updateRows(self);
+					setTimeout(self.updateRows, 500, self);
 				}
 
 			},
@@ -140,57 +140,49 @@
 					blocksMatrix[Math.floor(self.blocks[i].el.y / blockHeight)][self.blocks[i].el.x / blockWidth] = i;
 				}
 				
-				// console.log(blocksMatrix);
-
-				topMatrixLoop: for (i = 0; i < blocksMatrix.length; i++) {
+				topMatrixLoop: 
+				for (i = 0; i < rows; i++) {
 					if (blocksMatrix[i].length < cols) continue;
 
-					if (self.blocks[0] != undefined) {
-						opacity = self.blocks[0];
+					if (self.blocks[blocksMatrix[i][0]] != undefined) {
+						opacity = self.blocks[blocksMatrix[i][0]].el.opacity;
 					} else {
 						continue;
 					}
 
-					for (j = 1; j < blocksMatrix[i]; j++) {
-						if (self.blocks[blocksMatrix[i][j]] != undefined) {
-							if (self.blocks[blocksMatrix[i][j]] != opacity) continue topMatrixLoop;
-						} else {
+					for (j = 1; j < cols; j++) {
+						if (self.blocks[blocksMatrix[i][j]] == undefined || self.blocks[blocksMatrix[i][j]].el.opacity != opacity) {
 							continue topMatrixLoop;
 						}
 					}
 
+					done = true;	
+
 					// remove this row
-					for (j = 1; j < blocksMatrix[i]; j++) {
+					for (j = 0; j < cols; j++) {
 						self.blocks[blocksMatrix[i][j]].el.remove();
 						self.blocks.splice(blocksMatrix[i][j], 1);
 					}
+
+					// move all top blocks down
+					for (k = i - 1; k > 0; k--) {
+						for (j = 0; j < cols; j++) {
+							if (self.blocks[blocksMatrix[k][j]] != undefined) {
+								var timeline = canvas.Timeline.new(self.blocks[blocksMatrix[k][j]].el);
+								timeline.to(
+									{y: self.blocks[blocksMatrix[k][j]].el.y + blockHeight}, 
+									30, 
+									Ease.easeOutCubic)
+								.call();
+							}
+						}
+					}
+
+					break;
 				}
 
-				// for (i = 0; i < self.blocks.length; i++) {
-				// 	for (j = 0; j < self.blocks.length; j++) {
-				// 		if (i != j 
-				// 				&& self.blocks[i].el.x == self.blocks[j].el.x
-				// 				&& self.blocks[i].el.y == self.blocks[j].el.y + blockHeight
-				// 				&& self.blocks[i].el.opacity == self.blocks[j].el.opacity
-				// 				&& self.blocks[i].el.opacity < 1) {
-
-				// 			self.blocks[j].el.remove();
-				// 			self.blocks.splice(j, 1);
-
-				// 			var timeline = canvas.Timeline.new(self.blocks[i].el);
-				// 			timeline.to(
-				// 				{opacity: self.blocks[i].el.opacity + 0.25}, 
-				// 				30, 
-				// 				Ease.easeOutCubic)
-				// 			.call();
-
-				// 			done = true;
-				// 		}
-				// 	}
-				// }
-
 				if (done) {
-					setTimeout(this.updateRows, 500, self);
+					setTimeout(self.updateRows, 600, self);
 				}
 
 			},
