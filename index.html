@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+	<link href='http://fonts.googleapis.com/css?family=Grand+Hotel' rel='stylesheet' type='text/css'>
 	<style>
 		body { background-color: white; }
 	</style>
@@ -12,47 +13,105 @@
 	<script type="text/javascript">
 		var cols = 5;
 		var rows = 8;
-		var canvasWidth = 640;
+		var canvasWidth = 800;
 		var canvasHeight = 480;
 		var blockWidth = canvasWidth / cols;
 		var blockHeight = canvasHeight / rows;
-		var slow = 1.5
-		var fast = 8;
+		var slow = 2
+		var fast = 10;
 		var speed = slow;
 		var color = 'rgb(0, 153, 204)';
 
 		var canvas = CE.defines("game")
-			.extend(Input)
-			.extend(Hit)
-			.extend(Animation)
-			.ready(function() {
-			canvas.Scene.call("MyGame");
-		});
+				.extend(Input)
+				.extend(Hit)
+				.extend(Text)
+				.extend(Animation)
+				.ready(function() {
+					canvas.Scene.call("MyGame");
+				});
 
-		canvas.Scene.New({
-			name: "MyGame",
-			blocks: [],
-			colsFilled: [],
-			updateBlocks: null,
-			
-			ready: function(stage) {
-				var self = this;
 
-				for (i = 0; i < cols; i++) {
-					this.colsFilled[i] = [];
+		Class.create('Block', {
+			movingRightValue: 0,
+			movingLeftValue: 0,
+			movingSpeed: 50,
+
+			moveRight: function() {
+				// if (this.movingRightValue <= 0) 
+				if (this.el.x + this.movingRightValue + blockWidth < canvasWidth)
+					this.movingRightValue += blockWidth;
+			},
+
+			moveLeft: function() {
+				// if (this.movingLeftValue <= 0) 
+				if (this.el.x - this.movingLeftValue - blockWidth >= 0)
+					this.movingLeftValue += blockWidth;
+			},
+
+			update: function() {
+				if (this.movingRightValue > 0) {
+					if (this.movingRightValue < 10) tmpSpeed = this.movingRightValue;
+					else tmpSpeed = this.movingSpeed / (blockWidth / this.movingRightValue);
+					this.movingRightValue -= tmpSpeed;
+					this.move(tmpSpeed);
 				}
 
-				this.blocks[this.blocks.length] = this.createBlock(stage);
+				if (this.movingLeftValue > 0) {
+					if (this.movingLeftValue < 10) tmpSpeed = this.movingLeftValue;
+					else tmpSpeed = this.movingSpeed / (blockWidth / this.movingLeftValue);
+					this.movingLeftValue -= tmpSpeed;
+					this.move(-tmpSpeed);
+				}
+			}
+		}).extend('Entity');
+
+
+		var myGame = canvas.Scene.New({
+			name: "MyGame",
+			blocks: [],
+			grid: null,
+			score: 0,
+			scoreText: null,
+			welcomeSplash: null,
+			resultsSplash: null,
+
+			ready: function(stage) {
+
+				// create first block
+				this.blocks[0] = this.createBlock(stage);
+				stage.append(this.blocks[0].el);
+
+				// stage.refresh();
+
+				// init grid
+				this.grid = Class.New('Grid', [rows, cols]),
+				this.grid.setCellSize(blockWidth, blockHeight);
+
+				// getting pos
+				// pos = this.blocks[0].el.position();
+				// grid.getCellByPos(pos.left, pos.top));
+
+				myGame.scoreText = myGame.createElement(40, 40);
+				myGame.scoreText.font = '32px "Grand Hotel"';
+				myGame.scoreText.fillText(myGame.score, 'middle');
+				stage.append(myGame.scoreText);
+
+				myGame.pause(true);
+
+				canvas.Input.keyDown(Input.Enter, function() {
+					myGame.pause(false);
+				});
 
 				canvas.Input.keyDown(Input.Left, function() {
-					var currentBlock = self.blocks[self.blocks.length - 1];
+					var currentBlock = myGame.blocks[myGame.blocks.length - 1];
 
-					var lColHeight = (self.blocks.filter(function(element){
+					var lColHeight = (myGame.blocks.filter(function(element){
 						return (element.el.x == currentBlock.el.x - blockWidth);
 					}).length + 1) * blockHeight;
 
 					if (currentBlock.el.x > 0 && (canvasHeight - lColHeight) > currentBlock.el.y) {
-						self.blocks[self.blocks.length - 1].move(-blockWidth);
+						myGame.blocks[myGame.blocks.length - 1].moveLeft();
 					}
 				});
 
@@ -65,69 +124,66 @@
 				});
 
 				canvas.Input.keyDown(Input.Right, function() {
-					var currentBlock = self.blocks[self.blocks.length - 1];
+					var currentBlock = myGame.blocks[myGame.blocks.length - 1];
 
-					var rColHeight = (self.blocks.filter(function(element){
+					var rColHeight = (myGame.blocks.filter(function(element){
 						return (element.el.x == currentBlock.el.x + blockWidth);
 					}).length + 1)* blockHeight;
 
 					if (currentBlock.el.x < (cols - 1) * blockWidth && (canvasHeight - rColHeight) > currentBlock.el.y) {
-						self.blocks[self.blocks.length - 1].move(+blockWidth);
+						myGame.blocks[myGame.blocks.length - 1].moveRight();
 					}
 				});
 			},
 			
 			createBlock: function(stage) {
-				this.curCol = Math.round((cols - 1) * Math.random());
-
-				var block = Class.New('Entity', [stage]);
-				block.rect(blockWidth, this.blockHeight);
-				block.position(blockWidth * Math.round(Math.random() * 4), 0);
+				var block = Class.New('Block', [stage]);
+				block.rect(blockWidth, blockHeight);
+				block.position(blockWidth * Math.round(Math.random() * (cols - 1)), 0);
 				block.el.fillStyle = color;
 				block.el.opacity = (Math.round(Math.random() * 2) + 1) * 0.25;
+				// block.el.opacity = 0.5; // test
 				block.el.fillRect(0, 0, blockWidth, blockHeight);
 
-				stage.append(block.el);
 				return block;
 			},
 			
-			updateRelatedBlocks: function(self) {
+			updateRelatedBlocks: function(stage) {
 				var done = false;
 
-				for (i = 0; i < self.blocks.length; i++) {
-					for (j = 0; j < self.blocks.length; j++) {
+				for (i = 0; i < myGame.blocks.length; i++) {
+					for (j = 0; j < myGame.blocks.length; j++) {
 						if (i != j 
-								&& self.blocks[i].el.x == self.blocks[j].el.x
-								&& self.blocks[i].el.y == self.blocks[j].el.y + blockHeight
-								&& self.blocks[i].el.opacity == self.blocks[j].el.opacity
-								&& self.blocks[i].el.opacity < 1) {
+								&& myGame.blocks[i].el.x == myGame.blocks[j].el.x
+								&& myGame.blocks[i].el.y == myGame.blocks[j].el.y + blockHeight
+								&& myGame.blocks[i].el.opacity == myGame.blocks[j].el.opacity
+								&& myGame.blocks[i].el.opacity < 1) {
 
-							self.blocks[j].el.remove();
-							self.blocks.splice(j, 1);
+							myGame.blocks[j].el.remove();
+							myGame.blocks.splice(j, 1);
 
-							var timeline = canvas.Timeline.new(self.blocks[i].el);
+							var timeline = canvas.Timeline.new(myGame.blocks[i].el);
 							timeline.to(
-								{opacity: self.blocks[i].el.opacity + 0.25}, 
+								{opacity: myGame.blocks[i].el.opacity + 0.25}, 
 								30, 
 								Ease.easeOutCubic)
 							.call();
 
 							done = true;
+							myGame.score += 20;
 						}
 					}
 				}
 
 				if (done) {
-					setTimeout(self.updateRelatedBlocks, 600, self);
+					setTimeout(myGame.updateRelatedBlocks, 600, stage);
 				} else {
-					setTimeout(self.updateRows, 500, self);
+					myGame.updateRows(stage);
 				}
 
 			},
 
-			updateRows: function(self) {
-				// todo
-
+			updateRows: function(stage) {
 				var done = false;
 
 				var blocksMatrix = [];
@@ -136,41 +192,52 @@
 					blocksMatrix[i] = [];
 				}
 
-				for (i = 0; i < self.blocks.length; i++) {
-					blocksMatrix[Math.floor(self.blocks[i].el.y / blockHeight)][self.blocks[i].el.x / blockWidth] = i;
+				for (i = 0; i < myGame.blocks.length; i++) {
+					blocksMatrix[Math.floor(myGame.blocks[i].el.y / blockHeight)][myGame.blocks[i].el.x / blockWidth] = i;
 				}
 				
 				topMatrixLoop: 
 				for (i = 0; i < rows; i++) {
 					if (blocksMatrix[i].length < cols) continue;
 
-					if (self.blocks[blocksMatrix[i][0]] != undefined) {
-						opacity = self.blocks[blocksMatrix[i][0]].el.opacity;
+					if (myGame.blocks[blocksMatrix[i][0]] != undefined) {
+						opacity = myGame.blocks[blocksMatrix[i][0]].el.opacity;
 					} else {
 						continue;
 					}
 
 					for (j = 1; j < cols; j++) {
-						if (self.blocks[blocksMatrix[i][j]] == undefined || self.blocks[blocksMatrix[i][j]].el.opacity != opacity) {
+						if (myGame.blocks[blocksMatrix[i][j]] == undefined || myGame.blocks[blocksMatrix[i][j]].el.opacity != opacity) {
 							continue topMatrixLoop;
 						}
 					}
 
-					done = true;	
+					done = true;
 
 					// remove this row
+
+					myGame.score += 100;
+
+					var idsToRemove = [];
+
 					for (j = 0; j < cols; j++) {
-						self.blocks[blocksMatrix[i][j]].el.remove();
-						self.blocks.splice(blocksMatrix[i][j], 1);
+						idsToRemove[j] = [blocksMatrix[i][j]];
+					}
+
+					idsToRemove.sort();
+
+					for (j = idsToRemove.length - 1; j >= 0; j--) {
+						myGame.blocks[idsToRemove[j]].el.remove();
+						myGame.blocks.splice(idsToRemove[j], 1);
 					}
 
 					// move all top blocks down
 					for (k = i - 1; k > 0; k--) {
 						for (j = 0; j < cols; j++) {
-							if (self.blocks[blocksMatrix[k][j]] != undefined) {
-								var timeline = canvas.Timeline.new(self.blocks[blocksMatrix[k][j]].el);
+							if (myGame.blocks[blocksMatrix[k][j]] != undefined) {
+								var timeline = canvas.Timeline.new(myGame.blocks[blocksMatrix[k][j]].el);
 								timeline.to(
-									{y: self.blocks[blocksMatrix[k][j]].el.y + blockHeight}, 
+									{y: myGame.blocks[blocksMatrix[k][j]].el.y + blockHeight}, 
 									30, 
 									Ease.easeOutCubic)
 								.call();
@@ -182,46 +249,79 @@
 				}
 
 				if (done) {
-					setTimeout(self.updateRows, 600, self);
+					setTimeout(myGame.updateRows, 600, stage);
+				} else {
+					///
 				}
 
 			},
 
+			updateGrid: function(stage) {
+				var matrix = [];
+
+				// init empty matrix
+				for (i = 0; i < cols; i++) {
+					matrix[i] = [];
+					for (j = 0; j < rows; j++) {
+						matrix[i][j] = 0;
+					}
+				}
+
+				// fill matrix
+				for (i = 0; i < myGame.blocks.length; i++) {
+					pos = myGame.blocks[i].el.position();
+					gridPos = myGame.grid.getCellByPos(pos.left, pos.top);
+					matrix[gridPos.col][gridPos.row] = 1;
+				}
+
+				// assign matrix to grid
+				myGame.grid.setPropertyCell(matrix);
+			},
+
+			over: function() {
+				myGame.pause(true);
+			},
+
 			render: function(stage) {
-				// console.log(this.blocks);
-				// this.pause(true);
-				var self = this;
+				myGame.updateGrid(stage);
+
 				noMoving = true;
-				var currentBlock = this.blocks[this.blocks.length - 1];
 
-				var currentColHeight = this.blocks.filter(function(element){
-					return (element.el.x == currentBlock.el.x);
-				}).length * blockHeight;
+				for (i = 0; i < myGame.blocks.length; i++) {
+					pos = myGame.blocks[i].el.position();
+					gridPos = myGame.grid.getCellByPos(pos.left, pos.top);
 
-				if (currentBlock.el.y < canvasHeight - currentColHeight) {
-					this.blocks[this.blocks.length - 1].move(0, speed);
-					// this.blocks[this.blocks.length - 1].el.x = this.curCol * blockWidth;
-					noMoving = false;
-				} else {
-					if (currentColHeight > canvasHeight - blockHeight) this.pause(true);
-					currentBlock.el.y = canvasHeight - currentColHeight;
+					if (gridPos.row + 1 < rows) {
+						if (myGame.grid.getPropertyByCell(gridPos.col, gridPos.row + 1) == 0) {
+							myGame.blocks[i].move(0, speed);
+							noMoving = false;
+						} else {
+							if (gridPos.row == 0) {
+								myGame.over();
+							}
+							myGame.blocks[i].el.y = gridPos.row * blockHeight;
+						}
+					} else {
+						myGame.blocks[i].el.y = (rows - 1) * blockHeight;
+					}
+					myGame.blocks[i].update();
 				}
 
 				if (noMoving) {
-
-					var i = 0;
-
-					this.updateRelatedBlocks(this);
-					
-					self.blocks[self.blocks.length] = self.createBlock(stage);
+					myGame.updateRelatedBlocks(stage);
+					var block = myGame.createBlock(stage);
+					myGame.blocks[myGame.blocks.length] = block;
+					stage.append(block.el);
 					speed = slow;
-
 				}
+
+				myGame.scoreText.fillText(myGame.score, 20, 20);
+
 				stage.refresh();
 			}
 		});
 	</script>
 </head>
 <body>
-	<canvas id="game" width="640" height="600"></canvas>
+	<canvas id="game" width="800" height="480"></canvas>
 </body>
